@@ -1,0 +1,93 @@
+<div id="toptext">Body Tracking To Subway Surfers</div>
+<input type="checkbox" name="senddata" id="senddata" checked="true">
+<button id="calibrate" type="button" onclick="calibrate()">calibrate</button>
+<div> <h1 style="font-size: 40;" id="yvalue"></h1> </div>
+<div><canvas id="canvas"></canvas></div>
+<div id="label-container"></div>
+<script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@1.3.1/dist/tf.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@teachablemachine/pose@0.8/dist/teachablemachine-pose.min.js"></script>
+<script type="text/javascript">
+    let standingheight = 150
+    let lastpose
+    const socket = new WebSocket("ws://localhost:8080")
+    function sendsocket(pose) {
+        if (socket.readyState === 1) {
+            const nose = pose?.keypoints?.find(v => v?.part == "nose")
+            if (nose?.score > 0.5 && nose?.position.x>=0 && nose?.position.y>=0 && nose?.position.x<=300 && nose?.position.y<=300) {
+                const datapacket = {
+                    lane: Math.floor(nose.position.x/100),
+                    jump: (nose.position.y < standingheight-5),
+                    crouch: (nose.position.y > standingheight+50),
+                }
+                lastpose = nose.position.y
+                document.getElementById("yvalue").innerText = datapacket.jump
+                socket.send(JSON.stringify(datapacket))
+            }
+
+        } 
+    }
+    function calibrate() {
+        let numbers = []
+        for (let index = 0; index < 5; index++) {
+            setTimeout(() => {
+                numbers.push((index-5)*-1)
+                document.getElementById("toptext").innerText = `Calibrating: Please stand straight in the middle, recording position in: ${numbers.join(".. ")}`
+                if (index == 4) {
+                    standingheight = lastpose
+                    document.getElementById("toptext").innerText = "Calibrated!"
+                    setTimeout(() => {
+                        document.getElementById("toptext").innerText = "Body Tracking To Subway Surfers"
+                    }, 1000);
+                }
+            }, index*1000);
+        }
+    }
+    const URL = "https://teachablemachine.withgoogle.com/models/sqdgwwlry/";
+    let model, webcam, ctx, labelContainer, maxPredictions;
+    init()
+    async function init() {
+        const modelURL = URL + "model.json";
+        const metadataURL = URL + "metadata.json";
+        model = await tmPose.load(modelURL, metadataURL);
+        maxPredictions = model.getTotalClasses();
+        const size = 300;
+        const flip = true; // whether to flip the webcam
+        webcam = new tmPose.Webcam(size, size, flip); // width, height, flip
+        await webcam.setup();
+        await webcam.play();
+        window.requestAnimationFrame(loop);
+
+        const canvas = document.getElementById("canvas");
+        canvas.width = size; canvas.height = size;
+        ctx = canvas.getContext("2d");
+        labelContainer = document.getElementById("label-container");
+        for (let i = 0; i < maxPredictions; i++) { // and class labels
+            labelContainer.appendChild(document.createElement("div"));
+        }
+    }
+
+    async function loop(timestamp) {
+        if (document.getElementById("senddata").checked) {
+            webcam.update();
+            await predict();
+        }
+        window.requestAnimationFrame(loop);
+    }
+
+    async function predict() {
+        const { pose, posenetOutput } = await model.estimatePose(webcam.canvas);
+        sendsocket(pose)
+        drawPose(pose);
+    }
+
+    function drawPose(pose) {
+        if (webcam.canvas) {
+            ctx.drawImage(webcam.canvas, 0, 0);
+            if (pose) {
+                const minPartConfidence = 0.5;
+                tmPose.drawKeypoints(pose.keypoints, minPartConfidence, ctx);
+                tmPose.drawSkeleton(pose.keypoints, minPartConfidence, ctx);
+            }
+        }
+    }
+</script>
