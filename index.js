@@ -12,28 +12,14 @@ http.createServer(function (req, res) {
 
 const WebSocket = require("ws")
 const server = new WebSocket.Server({port: 8080})
-let currentlane = 1
-let lastv = 0
+let gamesocket
 server.on("connection", socket => {
+  socket.send("connected!")
+  console.log("client connected!")
   socket.on("message", (msg) => {
-      const datapacket = JSON.parse(msg.toString())
-      if (datapacket.lane != currentlane) {
-        if (currentlane > datapacket.lane) {
-          ks.sendKey("left")
-        } else if (currentlane < datapacket.lane) {
-          ks.sendKey("right")
-        }
-        currentlane = datapacket.lane
-      }
-      if (lastv+100 < new Date().getTime()) {
-        if (datapacket.jump) {
-          lastv = new Date().getTime()
-          ks.sendKey("up")
-        } else if (datapacket.crouch) {
-          lastv = new Date().getTime()
-          ks.sendKey("down")
-        }
-      }
-
+      if (msg.toString() == "GAMESOCKET") {gamesocket = socket; return}
+      const numb = parseFloat(msg.toString())
+      console.log(numb)
+        gamesocket?.send(Math.round((6.2-numb*2.4)*100000))
   })
 })

@@ -8,18 +8,20 @@
 <script type="text/javascript">
     let standingheight = 150
     let lastpose
-    const socket = new WebSocket("ws://192.168.1.139:8080")
+    const socket = new WebSocket("ws://localhost:8080")
     function sendsocket(pose) {
         if (socket.readyState === 1) {
+            console.log(pose?.keypoints)
             const nose = pose?.keypoints?.find(v => v?.part == "nose")
             if (nose?.score > 0.5 && nose?.position.x>=0 && nose?.position.y>=0 && nose?.position.x<=300 && nose?.position.y<=300) {
-                const datapacket = {
+                /*const datapacket = {
                     lane: Math.floor(nose.position.x/100),
                     jump: (nose.position.y < standingheight-10),
                     crouch: (nose.position.y > standingheight+50),
                 }
                 lastpose = nose.position.y
-                socket.send(JSON.stringify(datapacket))
+                socket.send(JSON.stringify(datapacket))*/
+                socket.send(nose.position.x/300)
             }
 
         } 
